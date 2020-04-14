@@ -1,6 +1,6 @@
 ---
 title: "data_processing"
-author: "Hannah Wang"
+author: "Sukyoung Cho, Hannah Wang"
 date: "3/25/2020"
 output: html_document
 ---
