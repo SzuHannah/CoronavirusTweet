@@ -1,0 +1,55 @@
+---
+title: "Coronavirus Tweet"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+  runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(dplyr)
+library(rtweet)
+library(tidyr)
+library(tidytext)
+library(readr)
+library(vsp)
+library(wordcloud2)
+library(shiny)
+#read data
+wordfreq_bydate_top50_wocoro<-readRDS("wordfreq_bydate_top50_wocoron.rds")
+```
+
+
+
+Tweet Explore
+=================================================================
+
+Column{.sidebar}
+-----------------------------------------------------------------------
+### Choose a date you want to see (data available from 02/01 to 03/31)
+
+```{r}
+dateInput('date',
+      label = 'Date input:',
+      value = '2020-02-01'
+)
+
+wordOfDate<-reactive({
+  index<-as.character(input$date)
+  wordfreq_bydate_top50_wocoro[[index]]
+})
+```
+
+Column 
+-----------------------------------------------------------------------
+
+### Word Cloud
+
+```{r}
+renderWordcloud2(
+  wordcloud2(wordOfDate(), size = 1.6, color = 'random-dark')
+)
+```
+

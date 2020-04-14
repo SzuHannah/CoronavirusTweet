@@ -1,0 +1,147 @@
+---
+title: "data_processing"
+author: "Hannah Wang"
+date: "3/25/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(rtweet)
+library(tidyr)
+library(tidytext)
+library(readr)
+library(vsp)
+library(tm)
+library(stringr)
+library(wordcloud2)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+confirmed_coro_jhu<-read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv")
+confirmed_coro_jhu
+```
+
+
+```{r}
+covid<-readRDS("covid_19_tweets.rds")
+#select the columns needed
+covidds<-covid%>%select(date, user_id, screen_name, text, flock_label, flock_category)
+#split the data frame into a list by date
+covidls<-split(covidds, f=covidds$date)
+```
+
+##stopwords
+```{r}
+#tidytext builtin stop words
+data("stop_words")
+#my stop words
+mystopword<-tibble(word = c("https","t.co","ー"))
+#rtwwet built-in stop words
+twitterstop<-stopwordslangs%>%filter(lang == "en")
+```
+
+## summarize all data's word frequency
+```{r}
+#the focused dataset
+#covidds
+#retrieve only the text column
+text_covid <- tibble(tweet = 1:nrow(covidds), text = covidds$text)
+text_covid
+
+#unnest the words into tokens
+token_txtcovid  = text_covid %>% unnest_tokens(word, text)
+#str(token_txtcovid)
+#column "tweet" means the row of the tweet in the text_covid, same number means they came from the same tweet
+
+#exclude the stop words
+tidy_txtcovid<-token_txtcovid %>% anti_join(stop_words) %>% anti_join(mystopword) %>% anti_join(twitterstop)
+
+#summarize the word frequency
+txtcovid_wordfreq<-tidy_txtcovid %>% count(word, sort = TRUE)
+txtcovid_wordfreq
+```
+
+##do summarize for each data frame in the list(an element of the list is a day)
+```{r}
+#retreive text column for each date
+text_bydate_covid<-lapply(covidls, function(x){
+  tibble(tweet = 1:nrow(x), text = x$text)
+})
+
+wordfreq_bydate_covid<-lapply(text_bydate_covid, function(x){
+  x %>% unnest_tokens(word, text)%>%
+    anti_join(stop_words)%>%
+    anti_join(mystopword)%>%
+    anti_join(twitterstop)%>%
+    count(word, sort = TRUE)
+})
+
+wordfreq_bydate_top20<-lapply(wordfreq_bydate_covid, function(x){
+  x %>% top_n(20)
+})
+
+#exclude the word coronavirus
+wordfreq_bydate_top20_wocoron<-lapply(wordfreq_bydate_covid, function(x){
+  x %>% 
+    filter(word != "coronavirus")%>%
+    top_n(20)
+})
+
+#exclude the word coronavirus, and include more words
+wordfreq_bydate_top50_wocoron<-lapply(wordfreq_bydate_covid, function(x){
+  x %>% 
+    filter(!word %in% c("coronavirus", "covid19", "covid", "coronavid19", "corona", "covid2019"))%>%
+    top_n(50)
+})
+
+##try plotting one of the date
+ds2<-wordfreq_bydate_top20_wocoron[[2]]
+#barchart
+ds2%>%
+  ggplot(aes(word))+geom_bar(aes(weight = n))
+#wordcloud
+ds2more<-wordfreq_bydate_top50_wocoron[[2]]
+wordcloud2(ds2more, size = 1.6, color = 'random-dark')
+```
+
+
+```{r}
+# make the document-term matrix.  
+#   I sometimes call this the bag-of-words-matrix.
+dt = cast_sparse(tt, tweet, word)
+dt[1:5,1:10]
+str(dt)
+dim(dt)
+hist(rowSums(dt))
+cs = colSums(dt)
+hist(log(cs[cs>1]))
+```
+
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+#rtwee tryout
+masktweet<-search_tweets(
+  "mask", n = 100, include_rts = FALSE
+)
+
+coronovirustweet<-search_tweets(
+  "coronovirus", n=100, include_rts = FALSE
+)
+
+masktweet
+coronovirustweet
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
