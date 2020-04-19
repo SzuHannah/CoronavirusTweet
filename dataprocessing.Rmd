@@ -12,10 +12,18 @@ library(rtweet)
 library(tidyr)
 library(tidytext)
 library(readr)
+#for topic cluster
 library(vsp)
 library(tm)
 library(stringr)
 library(wordcloud2)
+library(ggplot2)
+#plot multiple plots altogether
+library(gridExtra)
+#for twitter
+library(httr)
+library(rtweet)
+library(tidyverse)
 ```
 
 ## R Markdown
@@ -31,11 +39,232 @@ confirmed_coro_jhu
 
 
 ```{r}
-covid<-readRDS("covid_19_tweets.rds")
+#covid<-readRDS("covid_19_tweets.rds")
 #select the columns needed
-covidds<-covid%>%select(date, user_id, screen_name, text, flock_label, flock_category)
-#split the data frame into a list by date
-covidls<-split(covidds, f=covidds$date)
+#covidds<-covid%>%select(date, user_id, status_id,screen_name, text, flock_label, flock_category)
+covidds<-readRDS("covidds.rds")
+wordfreq_bydate_top50_wocoron<-readRDS("wordfreq_bydate_top50_wocoron.rds")
+#7 levels in total for flock_category:"liberals""conservatives" "media""issue-centric""pop culture""academia""other", but actually there's no data for "other"        
+#flock_categorylevel<-levels(covidds$flock_category)
+
+##split the data frame into a list by date
+#group by date, and then splic according to date key
+covid_day<-covidds %>% group_by(date)
+#check the groupkey
+groupkeyday<-group_keys(covid_day)
+#name the groupkey
+groupkeyday_name<-groupkeyday %>% mutate(group_name=str_c(as.character(date),"-","all"))
+#split by date
+covid_dayls<-covidds %>% group_by(date)%>%group_split()%>%setNames(groupkeyday_name$group_name)
+
+##split the data frame into a list by date and flock category
+#group by date and flock_category, and then split according to this date+flock_category key
+covid_dayflock<-covidds %>% group_by(date, flock_category)
+#check the keys in covid_dayflock
+groupkey<-group_keys(covid_dayflock)
+#groupkey
+#name the group keys, i.e. combine date and flock_category to create a group_name
+groupkey_name<-groupkey%>%mutate(group_name=str_c(as.character(date),"-",as.character(flock_category)))
+#groupkey_name
+#can do it in one line, and also assign category name with groupkey_name$group_name
+covid_dayflockls<-covidds %>% group_by(date, flock_category)%>%group_split()%>%setNames(groupkey_name$group_name)
+
+##covidds by date with all categories and by date-flockcategories
+covid_day_allbyflockls<-append(covid_dayls,covid_dayflockls)
+
+##split the data frame into a list by flock
+covid_flockls<-split(covidds,f=covidds$flock_category)[1:6]
+```
+
+##make clusters/topics for the whole covidds
+```{r}
+#all covid tweet token list, but will cause seesion abort..
+# covidttls<-readRDS("covidttls.rds")
+# covidflottls<-readRDS("covidflottls.rds")
+# covid_dayflockls<-readRDS("covid_dayflockls.rds")
+
+#covidtext by flock
+covidtextls <- lapply(covid_flockls,function(x){
+   tibble(tweet = 1:nrow(x), text = x$text)
+})
+
+#this sampled df will not cause session abort
+#covidtext by day-flock sampled, eventually use this one, since i make the df, and then sampled, the index can be used to search in original unsampled dataframe
+coviddayflotextls<-readRDS("coviddayflotextls.rds")
+coviddayflotextls <- lapply(covid_dayflockls,function(x){
+   df<-tibble(tweet = 1:nrow(x), text = x$text)
+   sample_frac(df,0.5)
+})
+
+# this does a lot of processing! 
+#  to lower, remove @ # , . 
+#  often these make sense on a first cut.
+#  worth revisiting before "final results"!
+covidflottls <- lapply(covidtextls, function(x){
+  x %>% unnest_tokens(word, text)
+})
+
+#sampled day flockls
+#coviddayflottls<-readRDS("coviddayflottls.rds")
+coviddayflottls <- lapply(coviddayflotextls, function(x){
+  x %>% unnest_tokens(word, text)
+})
+
+#sampled day-flock sparse matrix
+#coviddayflodt<-readRDS("coviddayflodt.rds")
+coviddayflodt<-lapply(coviddayflottls, function(x){
+  dt<-cast_sparse(x,tweet,word)
+})
+#sampled day-flock factors
+fadayflo<-lapply(coviddayflodt, function(x){
+  fa<-vsp(x,k=30)
+})
+
+#fadayflo<-readRDS("fadayflo.rds")
+#the index matrix for correspondent category
+topTweets = 5
+topDocdayflo<-lapply(fadayflo, function(x){
+  topDoc<-x$Z %>% apply(2, function(t) which(rank(-t, ties.method = "random") <= topTweets))
+})
+#try plot the result from 2020-02-01-media
+plot_varimax_z_pairs(fadayflo[[3]], 1:5)
+
+#topDocdayflo<-readRDS("topDocdayflo.rds")
+#covid_dayflockls<-readRDS("covid_dayflockls.rds")
+
+#the list of the top tweets by topic
+topicls<-lapply(seq_along(topDocdayflo), function(i){
+  df<-topDocdayflo[[i]]
+  txtdf<-covid_dayflockls[[i]]
+  ls<-list()
+  for(j in 1:ncol(df)){
+    name<-paste("topic", j)
+    ls[[j]]<-tibble(tweet = txtdf$text[df[,j]], status_id=txtdf$status_id[df[,j]],screen_name=txtdf$screen_name[df[,j]])
+    names(ls)[j]<-name
+  }
+  return(ls)
+})
+
+##name the topicls
+#name the topic list with date-category
+catname<-names(topDocdayflo)
+names(topicls)<-catname
+#topicls<-readRDS("topicls.rds")
+
+#paste twitter link to each dataframe, use this one!!!
+#get_embed url of twitter post
+get_embed <- function(status_id){
+
+  api_result <- httr::GET(paste0(
+    "https://publish.twitter.com/oembed?url=https%3A%2F%2Ftwitter.com%2FInterior%2Fstatus%2F",
+    status_id))
+
+  api_content <- httr::content(api_result)
+  html_content <- api_content[["html"]]
+  
+  return(html_content)
+}
+
+topiclswithlink<-lapply(topicls,function(ls){
+  lapply(ls, function(topic){
+    topic%>%
+      mutate(status_url=paste0("https://twitter.com/",screen_name,"/status/",status_id))%>%
+      mutate(embed_url=map(status_id,get_embed))
+  })
+})
+
+result<-httr::GET("https://publish.twitter.com/oembed?url=https%3A%2F%2Ftwitter.com%2FInterior%2Fstatus%2F507185938620219395")
+httr::content(result)
+#saveRDS(topiclswithlink,"topiclswithlink.rds")
+```
+
+###practice vsp
+```{r}
+# make the document-term matrix.  
+#   I sometimes call this the bag-of-words-matrix.
+dtliberal<-cast_sparse(coviddayflottls[[1]], tweet, word)
+faliberal = vsp(dtliberal, k=30)
+plot_varimax_z_pairs(faliberal, 1:10)
+
+dtmedia<-cast_sparse(coviddayflottls[[3]], tweet, word)
+famedia = vsp(dtmedia, k=30)
+plot_varimax_z_pairs(famedia, 1:10)
+textmedia<-covid_dayflockls[[2]]
+
+textmedia
+topDoc[,1]
+topiclsmedia<-list()
+for(j in 1:ncol(topDoc)){
+  name<-paste("topic", j)
+  topiclsmedia[[j]]<-tibble(tweet = textmedia$text[topDoc[,j]], status_id=textmedia$status_id[topDoc[,j]],screen_name=textmedia$screen_name[topDoc[,j]])
+  names(topiclsmedia)[j]<-name
+}
+#  then see what the document clusters appear to be:
+# 
+topTweets = 3
+# just run the next code chunk...
+
+topDoc = faliberal$Z %>% 
+  apply(2,
+        function(x) which(rank(-x, ties.method = "random") <= topTweets)
+  )
+covid_dayflockls<-readRDS("covid_dayflockls.rds")
+textliberal<-covid_dayflockls[[1]]
+
+for(j in 1:ncol(topDoc)){
+  paste("topic", j, "\n \n") %>% cat
+  textliberal$text[topDoc[,j]] %>% print
+  paste("\n \n \n") %>% cat
+}
+```
+
+##rtweet
+```{r}
+##check tweet with status id:
+#https://twitter.com/screen_name/status/status_id
+```
+
+
+```{r} 
+#karl's example
+dt = cast_sparse(tt, tweet, word)
+dt[1:5,1:10]
+str(dt)
+dim(dt)
+hist(rowSums(dt))
+cs = colSums(dt)
+hist(log(cs[cs>1]))
+#use library(vsp)
+fa = vsp(dt, k = 30)
+fa
+#if you see radial streaks, aligned with the axes in this plot:
+plot_varimax_z_pairs(fa, 1:10)
+
+#  then see what the document clusters appear to be:
+# 
+topTweets = 3
+# just run the next code chunk...
+
+topDoc = fa$Z %>% 
+  apply(2,
+        function(x) which(rank(-x, ties.method = "random") <= topTweets)
+  )
+
+topDoc
+
+for(j in 1:ncol(topDoc)){
+  paste("topic", j, "\n \n") %>% cat
+  text_df$text[topDoc[,j]] %>% print
+  paste("\n \n \n") %>% cat
+}
+library(glmnet)
+glm(y~as.matrix(fa$Z), family = "binomial") %>% summary
+cvfit = cv.glmnet(as.matrix(fa$Z),y, 
+                  family = "binomial",
+                  type.measure = "class", 
+                  nfolds = 5, 
+                  alpha = .1)
+plot(cvfit)
 ```
 
 ##stopwords
@@ -69,6 +298,93 @@ txtcovid_wordfreq<-tidy_txtcovid %>% count(word, sort = TRUE)
 txtcovid_wordfreq
 ```
 
+##do summarize for each date frame in the list(an element of the list is a day-category table)
+```{r}
+#retreive text column for each date
+text_bydateflo_covid<-lapply(covid_day_allbyflockls, function(x){
+  tibble(tweet = 1:nrow(x), text = x$text)
+})
+
+wordfreq_bydateflo_covid<-lapply(text_bydateflo_covid, function(x){
+  x %>% unnest_tokens(word, text)%>%
+    anti_join(stop_words)%>%
+    anti_join(mystopword)%>%
+    anti_join(twitterstop)%>%
+    count(word, sort = TRUE)
+})
+
+#exclude the word coronavirus, and include 20 words
+wordfreq_bydateflo_top20_wocoron<-lapply(wordfreq_bydateflo_covid, function(x){
+  x %>% 
+    filter(!word %in% c("coronavirus", "covid19", "covid", "coronavid19", "corona", "covid2019"))%>%
+    top_n(20)
+})
+
+#exclude the word coronavirus, and include 15 words
+wordfreq_bydateflo_top15_wocoron<-lapply(wordfreq_bydateflo_covid, function(x){
+  x %>% 
+    filter(!word %in% c("coronavirus", "covid19", "covid", "coronavid19", "corona", "covid2019"))%>%
+    top_n(15)
+})
+
+#exclude the word coronavirus, and include 50 words
+wordfreq_bydateflo_top50_wocoron<-lapply(wordfreq_bydateflo_covid, function(x){
+  x %>% 
+    filter(!word %in% c("coronavirus", "covid19", "covid", "coronavid19", "corona", "covid2019"))%>%
+    top_n(50)
+})
+```
+
+##try playing around with list
+```{r}
+
+##names of the elements in the list
+#names(wordfreq_bydateflo_top20_wocoron) 
+
+##try filter the list
+#flockname<-list("2020-02-01-liberals"=,"2020-02-01-conservatives")
+#flockofinterest<-wordfreq_bydateflo_top20_wocoron[unlist(flockname)]
+
+##try filter the list with flock name and date
+chosendate<-"2020-02-01"
+flockchoice<-list("liberals"="liberals","conservatives" = "conservatives")
+#filter list elements of interest
+flockname<-flockchoice
+indexls<-lapply(flockname, function(x){
+  str_c(as.character(chosendate),"-",x)
+})
+index<-unlist(indexls)
+interestls<-wordfreq_bydateflo_top20_wocoron[index]
+interestls[[1]]
+##plot all dataframe in the chosen list
+plot.list = lapply(interestls, function(x) {
+  df = x
+  ggplot(df, aes(word)) +
+    theme_bw() +
+    geom_bar(aes(weight = n))
+})
+
+plot.list = lapply(seq_along(interestls), function(i) {
+  labname = names(interestls)[i]
+  df = interestls[[i]]
+  ggplot(df, aes(word)) +
+    theme_bw() +
+    geom_bar(aes(weight = n))+
+    labs(title = labname)
+})
+# Lay out all the plots together
+#library(gridExtra)
+#can plot on multiple pages: marrageGrob
+marrangeGrob(plot.list,nrow=1,ncol=2)
+do.call(grid.arrange, plot.list) 
+#customized plot arrange
+n <- length(plot.list)
+nRow <- floor(sqrt(n))
+do.call("grid.arrange", c(plot.list, nrow=nRow))
+```
+
+
+
 ##do summarize for each data frame in the list(an element of the list is a day)
 ```{r}
 #retreive text column for each date
@@ -101,7 +417,9 @@ wordfreq_bydate_top50_wocoron<-lapply(wordfreq_bydate_covid, function(x){
     filter(!word %in% c("coronavirus", "covid19", "covid", "coronavid19", "corona", "covid2019"))%>%
     top_n(50)
 })
+```
 
+```{r}
 ##try plotting one of the date
 ds2<-wordfreq_bydate_top20_wocoron[[2]]
 #barchart

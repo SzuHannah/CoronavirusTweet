@@ -2,7 +2,6 @@
 title: "Coronavirus Tweet"
 output: 
   flexdashboard::flex_dashboard:
-    orientation: columns
     vertical_layout: fill
 runtime: shiny
   
@@ -11,46 +10,146 @@ runtime: shiny
 ```{r setup, include=FALSE}
 library(flexdashboard)
 library(dplyr)
-library(rtweet)
 library(tidyr)
 library(tidytext)
 library(readr)
-library(vsp)
+##didn't use it here, this was used in the dataprocessing.Rmd
+#library(vsp)
+#link:https://github.com/RoheLab/vsp
 library(wordcloud2)
 library(shiny)
+library(purrr)
+library(stringr)
+library(ggplot2)
+#layout all plot at once
+library(gridExtra)
+#reorder
+library(forcats)
 #read data
-wordfreq_bydate_top50_wocoro<-readRDS("wordfreq_bydate_top50_wocoron.rds")
+wordfreq_bydateflo_top15_wocoron<-readRDS("wordfreq_bydateflo_top15_wocoron.rds")
+topiclswithlink<-readRDS("topiclswithlink.rds")
+flockchoices<-tibble(flock=c("liberals","conservatives","media","issue-centric","pop culture","academia"))
+topicchoices<-tibble(topic=c("topic 1","topic 2","topic 3",
+                   "topic 4","topic 5", "topic 6","topic 7",
+                   "topic 8", "topic 9","topic 10",
+                   "topic 11","topic 12","topic 13",
+                   "topic 14","topic 15","topic 16","topic 17",
+                   "topic 18","topic 19","topic 20",
+                   "topic 21","topic 22","topic 23",
+                   "topic 24","topic 25","topic 26","topic 27",
+                   "topic 28","topic 29","topic 30"))
 ```
 
 
-
-Tweet Explore
+Sidebar {.sidebar}
 =================================================================
-
-Column{.sidebar}
------------------------------------------------------------------------
 ### Choose a date you want to see (data available from 02/01 to 03/31)
 
 ```{r}
+#usually i put input widgets here
 dateInput('date',
       label = 'Date input:',
       value = '2020-02-01'
 )
 
+checkboxGroupInput("flock", label = 'flock of interest', 
+                 choices = list("liberals"="liberals", "conservatives"="conservatives", "media"="media",
+                                "issue-centric"="issue-centric","pop culture"="pop culture","academia"="academia")
+)
+
+selectInput("topic", label = "Topic cluster",
+              choices = topicchoices$topic, 
+               selected = "topic 1")
+
+
+selectInput("oneflock", label = 'choose one flock',
+             choices = flockchoices$flock)
+
+#also, will put reactive data here
 wordOfDate<-reactive({
-  index<-as.character(input$date)
-  wordfreq_bydate_top50_wocoro[[index]]
+  index<-str_c(as.character(input$date),"-","all")
+  wordfreq_bydateflo_top15_wocoron[[index]]
+})
+
+wordOfFlock<-reactive({
+  flockchoice<-input$flock
+  datechoice<-as.character(input$date)
+  indexls<-lapply(flockchoice, function(x){
+    str_c(datechoice,"-",x)
+  })
+  index<-unlist(indexls)
+  interestls<-wordfreq_bydateflo_top15_wocoron[index]
+})
+
+tweetsurl<-reactive({
+  topchoice<-as.character(input$topic)
+  flockchoice<-as.character(input$oneflock)
+  datechoice<-as.character(input$date)
+  indexdatflo<-str_c(datechoice,"-",flockchoice)
+  tweetdf<-topiclswithlink[[indexdatflo]][[topchoice]]
+  tibble(embeded = tweetdf$embed_url%>%unlist())
+})
+#for each chunck below, i just put renderXXX functions, eg. renderwordcloud, renderplot, renderUI...
+```
+
+
+Tweet Explore
+=================================================================
+
+Column{data-width=400}
+-----------------------------------------------------------------------
+
+### Word Frequency (Summary of the date-word cloud) 
+```{r}
+renderWordcloud2(
+  wordcloud2(wordOfDate(), size = 0.5, color = 'random-dark')
+)
+
+```
+
+### Sentiment distribution of each flock 
+```{r}
+#not implemented yet
+```
+
+
+Column{data-width=600}
+-----------------------------------------------------------------------
+### Word Frequency (Summary by flock within the date)
+
+```{r}
+renderPlot({
+  ls = wordOfFlock()
+  ##plot all dataframe in the chosen list
+  plot.list = lapply(seq_along(ls), function(i) {
+    dfname = names(ls)[i]
+    df = ls[[i]] %>% mutate(word = fct_reorder(word, n))
+    ggplot(df, aes(y=word)) +
+    theme_bw() +
+    geom_bar(aes(weight = n),fill ="skyblue", width = .7)+
+      labs(title=dfname)+
+      theme(text=element_text(size=17))
+  })
+  # Lay out all the plots together
+  n <- length(plot.list)
+  if(n >= 1){
+    nCol <- floor(sqrt(n))
+    do.call("grid.arrange", c(plot.list, ncol=nCol))
+  }
 })
 ```
 
-Column 
------------------------------------------------------------------------
-
-### Word Cloud
+Tweet Wall (Topic clusters)
+=================================================================
 
 ```{r}
-renderWordcloud2(
-  wordcloud2(wordOfDate(), size = 1.6, color = 'random-dark')
-)
+renderUI({
+    tags$head(
+    tags$script("!function(d,s,id){var js,fjs=d.getElementsByTagName(s)    [0],p=/^http:c(/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document,'script','twitter-wjs');")
+  )
+    df = tweetsurl()
+    urlvec<-df$embeded
+    urlvec%>% HTML()
+})
 ```
 
