@@ -118,6 +118,33 @@ Column{data-width=600}
 ### Word Frequency (Summary by flock within the date)
 
 ```{r}
+## Data source: https://covid.ourworldindata.org/data/ecdc/full_data.csv
+# renderPlot({
+#   ls = wordOfFlock()
+#   ##plot all dataframe in the chosen list
+#   plot.list = lapply(seq_along(ls), function(i) {
+#     dfname = names(ls)[i]
+#     df = ls[[i]] %>% mutate(word = fct_reorder(word, n))
+#     ggplot(df, aes(y=word)) +
+#     theme_bw() +
+#     geom_bar(aes(weight = n),fill ="skyblue", width = .7)+
+#       labs(title=dfname)+
+#       theme(text=element_text(size=17))
+#   })
+#   # Lay out all the plots together
+#   n <- length(plot.list)
+#   if(n >= 1){
+#     nCol <- floor(sqrt(n))
+#     do.call("grid.arrange", c(plot.list, ncol=nCol))
+#   }
+# })
+```
+
+Column{data-width=400}
+-----------------------------------------------------------------------
+### Spread of Covid-19 (Relationship between the spread of the virus and Tweet)
+
+```{r}
 renderPlot({
   ls = wordOfFlock()
   ##plot all dataframe in the chosen list
