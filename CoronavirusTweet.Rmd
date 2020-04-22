@@ -2,7 +2,7 @@
 title: "Coronavirus Tweet"
 output: 
   flexdashboard::flex_dashboard:
-    vertical_layout: fill
+    orientation: rows
 runtime: shiny
   
 ---
@@ -25,9 +25,17 @@ library(ggplot2)
 library(gridExtra)
 #reorder
 library(forcats)
+#cssholder
+library(shinycssloaders)
+library(plotly)
+library(shinyWidgets)
 #read data
 wordfreq_bydateflo_top15_wocoron<-readRDS("wordfreq_bydateflo_top15_wocoron.rds")
 topiclswithlink<-readRDS("topiclswithlink.rds")
+tidypredcovds<-readRDS("tidypredcovds.rds")
+lmformds<-readRDS("lmformds.rds")
+wordpredictors<-readRDS("wordpredictors.rds")
+
 flockchoices<-tibble(flock=c("liberals","conservatives","media","issue-centric","pop culture","academia"))
 topicchoices<-tibble(topic=c("topic 1","topic 2","topic 3",
                    "topic 4","topic 5", "topic 6","topic 7",
@@ -38,6 +46,8 @@ topicchoices<-tibble(topic=c("topic 1","topic 2","topic 3",
                    "topic 21","topic 22","topic 23",
                    "topic 24","topic 25","topic 26","topic 27",
                    "topic 28","topic 29","topic 30"))
+casetypes<-c("total_confirm","total_test","confirm_test","new_cases","new_deaths","total_deaths")
+
 ```
 
 
@@ -54,7 +64,8 @@ dateInput('date',
 
 checkboxGroupInput("flock", label = 'flock of interest', 
                  choices = list("liberals"="liberals", "conservatives"="conservatives", "media"="media",
-                                "issue-centric"="issue-centric","pop culture"="pop culture","academia"="academia")
+                                "issue-centric"="issue-centric","pop culture"="pop culture","academia"="academia"),
+                 selected=c("liberals","media","academia")
 )
 
 selectInput("topic", label = "Topic cluster",
@@ -96,53 +107,9 @@ tweetsurl<-reactive({
 Tweet Explore
 =================================================================
 
-Column{data-width=400}
------------------------------------------------------------------------
-
-### Word Frequency (Summary of the date-word cloud) 
-```{r}
-renderWordcloud2(
-  wordcloud2(wordOfDate(), size = 0.5, color = 'random-dark')
-)
-
-```
-
-### Sentiment distribution of each flock 
-```{r}
-#not implemented yet
-```
-
-
-Column{data-width=600}
+Row{data-height=650}
 -----------------------------------------------------------------------
 ### Word Frequency (Summary by flock within the date)
-
-```{r}
-## Data source: https://covid.ourworldindata.org/data/ecdc/full_data.csv
-# renderPlot({
-#   ls = wordOfFlock()
-#   ##plot all dataframe in the chosen list
-#   plot.list = lapply(seq_along(ls), function(i) {
-#     dfname = names(ls)[i]
-#     df = ls[[i]] %>% mutate(word = fct_reorder(word, n))
-#     ggplot(df, aes(y=word)) +
-#     theme_bw() +
-#     geom_bar(aes(weight = n),fill ="skyblue", width = .7)+
-#       labs(title=dfname)+
-#       theme(text=element_text(size=17))
-#   })
-#   # Lay out all the plots together
-#   n <- length(plot.list)
-#   if(n >= 1){
-#     nCol <- floor(sqrt(n))
-#     do.call("grid.arrange", c(plot.list, ncol=nCol))
-#   }
-# })
-```
-
-Column{data-width=400}
------------------------------------------------------------------------
-### Spread of Covid-19 (Relationship between the spread of the virus and Tweet)
 
 ```{r}
 renderPlot({
@@ -160,14 +127,32 @@ renderPlot({
   # Lay out all the plots together
   n <- length(plot.list)
   if(n >= 1){
-    nCol <- floor(sqrt(n))
-    do.call("grid.arrange", c(plot.list, ncol=nCol))
+    nRow <- floor(sqrt(n))
+    do.call("grid.arrange", c(plot.list, nrow=nRow))
   }
 })
 ```
 
+Row{data-height=350}
+-----------------------------------------------------------------------
+
+### Word Frequency (Summary of the date-word cloud) 
+```{r}
+renderWordcloud2(
+  wordcloud2(wordOfDate(), size = 0.5, color = 'random-dark')
+)
+```
+
+### Sentiment distribution of each flock 
+```{r}
+#not implemented yet
+```
+
+
 Tweet Wall (Topic clusters)
 =================================================================
+Column{data-width=400}
+-----------------------------------------------------------------------
 
 ```{r}
 renderUI({
@@ -178,5 +163,123 @@ renderUI({
     urlvec<-df$embeded
     urlvec%>% HTML()
 })
+
 ```
 
+
+Spread of Covid-19 virsus Tweets
+=================================================================
+Row{data-height=400}
+-----------------------------------------------------------------------
+### Covid-19 Confirmed, Tested
+```{r}
+## Data source: https://covid.ourworldindata.org/data/ecdc/full_data.csv
+renderPlot({
+  ds<-tidypredcovds%>%filter(case_type==c("total_confirm","total_test"))
+  ggplot(ds,aes(x=date, y=case_number,group=case_type))+geom_line(aes(color=case_type))+theme_bw()
+})
+
+
+```
+
+### Covid-19 Confirm per 100 tests
+```{r}
+renderPlot({
+  ds<-tidypredcovds%>%filter(case_type=="confirm_test")
+  ggplot(ds,aes(x=date, y=case_number))+geom_line()+theme_bw()
+})
+```
+
+
+Row{data-height=600}
+-----------------------------------------------------------------------
+### Facet plot - relationship between a chosen word's occurance and log(case numbers) 
+```{r}
+#common words: words occur in more than 40 days
+selectInput("word", label = "Top Common Words",
+              choices = wordpredictors, 
+               selected = "epidemic")
+
+wordtofacet<-reactive({
+  wordpred<-input$word
+  tidypredcovds%>%filter(word==wordpred)
+})
+
+renderPlot({
+  df<-wordtofacet()
+  df%>%ggplot(aes(x=n, y=log(case_number)))+geom_point()+facet_wrap(~case_type,scales = "free")+labs(x="count",y="log(case number)")+theme_bw()
+},height=390)
+```
+
+### Single plot - plot the word and case-type of interest (w/o taking log)
+```{r}
+
+#common words: words occur in more than 40 days
+selectInput("word2", label = "Top Common Words (x)",
+              choices = wordpredictors, 
+               selected = "infected")
+#common words: words occur in more than 40 days
+selectInput("casetype", label = "Case Type (y)",
+              choices = casetypes, 
+               selected = "total_confirm")
+
+
+interestds<-reactive({
+  wordpred<-input$word2
+  case<-input$casetype
+  tidypredcovds%>%filter(word==wordpred)%>%filter(case_type==case)
+})
+
+renderPlotly({
+  df<-interestds()
+  plot_ly(
+    type = 'scatter',
+    x= df$n,
+    y= df$case_number,
+    text=paste("Date: ",df$date,
+               "<br>Word Count: ",df$n,
+               "<br>Case Nmuber: ",df$case_number),
+    hoverinfo='text',
+    height = 350
+  )
+})
+```
+
+### Linear model(take log for total confirm & test)
+```{r}
+checkboxGroupInput("wordpreds", label = 'Choose one or more words as predictors', 
+                 choices = wordpredictors,selected = "wuhan"
+)
+
+radioButtons("depend", label = 'Choose a case-type as the dependent variable',
+             choices = casetypes, selected = "total_confirm")
+
+#change to original lmformds
+#select the columns user choose
+#do logtransformation for non-0 values
+#cauclate lm
+lmds<-reactive({
+   preds<-input$wordpreds
+   dep<-input$depend
+   allsel<-c(preds,dep)
+   ds<-lmformds[,allsel]
+   cleands<-ds%>%drop_na()
+   if(input$depend %in% c("total_confirm","total_test")){
+     cleands[,dep]<-log(cleands[,dep])
+     isinfin<-sapply(cleands,is.infinite)
+     cleands[isinfin]<-0
+   }else{
+     #cleands
+     cleands
+   }
+   lm(reformulate(input$wordpreds,input$depend),cleands)
+ })
+ 
+# renderTable(
+#   lmds()
+# )
+
+renderPrint({
+   summary(lmds())
+})
+```

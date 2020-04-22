@@ -24,7 +24,9 @@ library(gridExtra)
 library(httr)
 library(rtweet)
 library(tidyverse)
+library(lubridate)
 ```
+
 
 ## R Markdown
 
@@ -178,9 +180,95 @@ httr::content(result)
 #saveRDS(topiclswithlink,"topiclswithlink.rds")
 ```
 
+###find common words across days
+```{r}
+wordfreq_bydateflo_top15_wocoron<-readRDS("wordfreq_bydateflo_top15_wocoron.rds")
+  all60topwordls<-wordfreq_bydateflo_top15_wocoron[1:60]
+summaryls<-lapply(seq_along(all60topwordls), function(x){
+  df<-all60topwordls[[x]]%>%mutate(date=names(all60topwordls[x]))
+})
+summaryds<-bind_rows(summaryls,.id="column_label")
+wordoccur40<-summaryds%>%group_by(word)%>%filter(n()>40)
+#the words that occur in more than 40 days
+thewords<-wordoccur40%>%group_by(word)%>%summarise(count=n())
+wordpredictors<-thewords$word
+saveRDS(wordpredictors,"wordpredictors.rds")
+dswithwordpred<-wordoccur40%>%filter(word %in% wordpredictors)%>%mutate(date=as.Date(date))
+dswithwuhan<-dswithwordpred%>%filter(word=="wuhan")
+dswithwordpred
+#each word is a data frame: count v.s. date
+wordpredls<-dswithwordpred%>%group_by(word)%>%group_split()
+names(wordpredls)<-wordpredictors
+#plot each word's count v.s. date(take log for word, since pandemic increases exponentially in the end of march) 
+dswithwordpred %>% ggplot()+geom_line(aes(x = as.Date(date), y = log(n), color=word))
+#or maybe do facetchart?
+```
+
+###coronavirus data
+```{r}
+covidspread<-read_csv("full_data.csv")
+covidus_casedeath<-covidspread %>% filter(location == "United States")%>%filter(between(date,as.Date("2020-02-01"),as.Date("2020-03-31")))
+covidus_casedeathsel<-covidus_casedeath%>%select(date, new_cases, new_deaths,total_cases,total_deaths)
+covidtestconfir<-read_csv("covid-19-total-confirmed-cases-vs-total-tests-conducted.csv")
+covidtestconfir%>%filter(Entity=="United States")
+covidustestconf<-covidtestconfir%>%filter(Entity == "United States")%>%mutate(Date=mdy(Date))%>%filter(between(Date, as.Date("2020-02-01"),as.Date("2020-03-31")))
+#add a column that calculate confim/test
+covidusspread<-covidustestconf%>%mutate(date = Date)
+covidusspreadsel<-covidusspread%>%select(date,`Total confirmed cases of COVID-19 (cases)`,`Total tests`)%>%
+  mutate(total_confirm=`Total confirmed cases of COVID-19 (cases)`,total_test=`Total tests`)%>%mutate(confirm_test=(total_confirm/total_test)*100)
+
+covidusspreadsel%>%ggplot()+geom_line(aes(x = date, y = confirm_test),color="red")+
+                        geom_line(aes(x = date, y = total_confirm),color="blue")+
+                        geom_line(aes(x = date, y = total_test),color="black")
+```
+
+
+###combin coronavirus and tweet
+```{r}
+covidusspreadsel<-covidusspreadsel%>%select(date, total_confirm,total_test,confirm_test)
+covidusspreadsel
+covidus_casedeathsel<-covidus_casedeathsel%>%select(-total_cases)
+wordpredcov<-lapply(wordpredls, function(x){
+  x %>% left_join(covidusspreadsel)%>%left_join(covidus_casedeathsel)
+})
+
+wordpredcovds<-bind_rows(wordpredcov)
+#tidy form for ggpplot
+tidypredcovds<-wordpredcovds%>%pivot_longer(cols = c("total_confirm","total_test","confirm_test","new_cases","new_deaths","total_deaths"),names_to = "case_type",values_to = "case_number")%>%drop_na()
+epidcov<-wordpredcov[[4]]
+tidyepidcov<-epidcov%>%pivot_longer(cols = c("total_confirm","total_test","confirm_test","new_cases","new_deaths","total_deaths"),names_to = "case_type",values_to = "case_number")%>%drop_na()
+#take log for case_number since they are all increasing exponentially
+tidyepidcov%>%ggplot(aes(x=n, y=log(case_number)))+geom_point()+facet_wrap(~case_type,scales = "free")
+
+#untidy form for linear model
+lmformds<-wordpredcovds%>%group_by(date)%>%pivot_wider(names_from = word,values_from = n)
+selection=c("epidemic", "infected")
+type=c("total_confirm")
+lms<-lmformds[,c(selection,type)]
+lms[,type]<-log(lms[,type])
+lms
+lmformds
+loglmds<-lmformds%>%mutate(total_confirm=log(total_confirm),total_test=log(total_test),confirm_test=log(confirm_test),
+                  new_cases=log(new_cases),new_deaths=log(new_deaths),total_deaths=log(total_deaths))
+#tryout
+totalconfword<-wordpredcovds%>%select(word,n,date,total_confirm)%>%group_by(date)%>%pivot_wider(names_from = word,values_from = n)
+totalconfword_wona<-totalconfword%>%drop_na()
+totalconfword_wona
+#plot(totalconfword_wona$realdonaldtrump,totalconfword_wona$total_confirm)
+lm1<-lm(log(total_confirm)~.-date,totalconfword_wona)
+summary(lm1)
+##save RDS to use
+saveRDS(tidypredcovds,"tidypredcovds.rds")
+saveRDS(lmformds,"lmformds.rds")
+saveRDS(loglmds,"loglmds.rds")
+#prevent overfitting, just take 3 words as predictors
+```
+
+
+
 ###practice vsp
 ```{r}
-# make the document-term matrix.  
+# make the document-term matrix.    
 #   I sometimes call this the bag-of-words-matrix.
 dtliberal<-cast_sparse(coviddayflottls[[1]], tweet, word)
 faliberal = vsp(dtliberal, k=30)
@@ -194,7 +282,7 @@ textmedia<-covid_dayflockls[[2]]
 textmedia
 topDoc[,1]
 topiclsmedia<-list()
-for(j in 1:ncol(topDoc)){
+  for(j in 1:ncol(topDoc)){
   name<-paste("topic", j)
   topiclsmedia[[j]]<-tibble(tweet = textmedia$text[topDoc[,j]], status_id=textmedia$status_id[topDoc[,j]],screen_name=textmedia$screen_name[topDoc[,j]])
   names(topiclsmedia)[j]<-name
@@ -267,7 +355,7 @@ cvfit = cv.glmnet(as.matrix(fa$Z),y,
 plot(cvfit)
 ```
 
-##stopwords
+  ##stopwords
 ```{r}
 #tidytext builtin stop words
 data("stop_words")
