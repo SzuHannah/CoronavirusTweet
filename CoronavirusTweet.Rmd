@@ -35,7 +35,8 @@ topiclswithlink<-readRDS("topiclswithlink.rds")
 tidypredcovds<-readRDS("tidypredcovds.rds")
 lmformds<-readRDS("lmformds.rds")
 wordpredictors<-readRDS("wordpredictors.rds")
-
+#sentifment ds
+uncombineds<-readRDS("uncombineds.rds")
 flockchoices<-tibble(flock=c("liberals","conservatives","media","issue-centric","pop culture","academia"))
 topicchoices<-tibble(topic=c("topic 1","topic 2","topic 3",
                    "topic 4","topic 5", "topic 6","topic 7",
@@ -103,6 +104,12 @@ tweetsurl<-reactive({
 #for each chunck below, i just put renderXXX functions, eg. renderwordcloud, renderplot, renderUI...
 ```
 
+It is said that social network is a place where people discuss things they care about, regarding public health, politics, economics, and etc.  
+
+Often, the discussions are correlated with the development of an event, and can even predict the result, such as an election. During last H1N1 outbreak, there are people using twitter to see 
+if the amount of disease-related words can predict the spread of H1N1. Therefore, for the COVID-19 outbreak, we are interested in examining if such relationship exists. As a biginning, we'll look at the linear relationship. 
+
+The app serves to allow users to explore the tweets under #coronavirus, and plot the relationships between COVID-19 cases and tweet words. 
 
 Tweet Explore
 =================================================================
@@ -145,9 +152,21 @@ renderWordcloud2(
 
 ### Sentiment distribution of each flock 
 ```{r}
-#not implemented yet
-```
+#filter by day and flock chosen
+sents<-reactive({
+  d<-as.character(input$date)
+  fl<-input$flock
+  uncombineds%>%
+    filter(str_detect(column_label,d))%>%
+    filter(str_detect(column_label,fl))
+})
 
+#plot sentiment
+renderPlot({
+  ds<-sents()
+  ds%>%ggplot(aes(x=column_label,y=sentiment))+geom_boxplot()+theme_bw()
+})
+```
 
 Tweet Wall (Topic clusters)
 =================================================================
@@ -208,7 +227,7 @@ wordtofacet<-reactive({
 renderPlot({
   df<-wordtofacet()
   df%>%ggplot(aes(x=n, y=log(case_number)))+geom_point()+facet_wrap(~case_type,scales = "free")+labs(x="count",y="log(case number)")+theme_bw()
-},height=390)
+},height=370)
 ```
 
 ### Single plot - plot the word and case-type of interest (w/o taking log)
@@ -240,7 +259,7 @@ renderPlotly({
                "<br>Word Count: ",df$n,
                "<br>Case Nmuber: ",df$case_number),
     hoverinfo='text',
-    height = 350
+    height = 330
   )
 })
 ```

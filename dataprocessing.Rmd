@@ -98,6 +98,7 @@ coviddayflotextls <- lapply(covid_dayflockls,function(x){
    sample_frac(df,0.5)
 })
 
+
 # this does a lot of processing! 
 #  to lower, remove @ # , . 
 #  often these make sense on a first cut.
@@ -179,6 +180,47 @@ result<-httr::GET("https://publish.twitter.com/oembed?url=https%3A%2F%2Ftwitter.
 httr::content(result)
 #saveRDS(topiclswithlink,"topiclswithlink.rds")
 ```
+
+###sentiment analysis
+```{r}
+#sentiment analysis
+library(sentimentr)
+coviddayflotextls
+outls<-lapply(seq_along(coviddayflotextls),function(x){
+  ds<-bind_rows(coviddayflotextls[x], .id = "column_label")
+  with(ds,sentiment_by(
+    get_sentences(text),
+    list(column_label)))
+})
+bind_rows(coviddayflotextls[1], .id = "column_label")
+uncombinout<-lapply(outls, function(x){
+  uncombine(x)
+})
+saveRDS(uncombinout,"uncombinout.rds")
+
+uncombineds<-bind_rows(uncombinout)
+saveRDS(uncombineds,"uncombineds.rds")
+#filter by month
+filterm<-uncombineds%>%filter(str_detect(column_label,"2020-02-02"))
+#filter by flock label
+filterflo<-filterm%>%filter(str_detect(column_label,c("liberals","conservatives")))
+#plot sentiment
+ggplot(filterflo, aes(x=column_label, y=sentiment))+geom_boxplot()+theme_bw()
+#str_detect from stringr
+feb02<-outds%>%filter(str_detect(column_label,"2020-02-02"))
+plot(feb02)
+feb02%>%filter(str_detect(column_label,c("liberals","conservatives")))
+#coviddayflotextds<-bind_rows(coviddayflotextls, .id="column_label")
+out<-with(coviddayflotextds,
+          sentiment_by(get_sentences(text),
+                       list(column_label)))
+#saveRDS(coviddayflotextsent,"coviddayflotextsend.rds")
+coviddayflotextsent<-readRDS("coviddayflotextsend.rds")
+plot(combine(coviddayflotextsent[[1]]))
+
+```
+
+
 
 ###find common words across days
 ```{r}
