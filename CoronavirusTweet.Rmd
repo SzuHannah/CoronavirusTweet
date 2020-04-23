@@ -69,12 +69,12 @@ checkboxGroupInput("flock", label = 'flock of interest',
                  selected=c("liberals","media","academia")
 )
 
-selectInput("topic", label = "Topic cluster",
+selectInput("topic", label = "Topic cluster (tweet wall)",
               choices = topicchoices$topic, 
                selected = "topic 1")
 
 
-selectInput("oneflock", label = 'choose one flock',
+selectInput("oneflock", label = 'Choose one flock (tweet wall)',
              choices = flockchoices$flock)
 
 #also, will put reactive data here
@@ -116,7 +116,7 @@ Tweet Explore
 
 Row{data-height=650}
 -----------------------------------------------------------------------
-### Word Frequency (Summary by flock within the date)
+### Word Frequency (Summary by flock within the date)**words occur in > 40 days: epidemic, infected, outbreak, pandemic, quarantine, realdonaldtrump, wuhan
 
 ```{r}
 renderPlot({
@@ -156,9 +156,8 @@ renderWordcloud2(
 sents<-reactive({
   d<-as.character(input$date)
   fl<-input$flock
-  uncombineds%>%
-    filter(str_detect(column_label,d))%>%
-    filter(str_detect(column_label,fl))
+  dayds<-uncombineds%>%filter(str_detect(column_label,d))
+  flockds<-dayds%>%filter(str_detect(column_label,fl))
 })
 
 #plot sentiment
@@ -186,7 +185,7 @@ renderUI({
 ```
 
 
-Spread of Covid-19 virsus Tweets
+Spread of Covid-19 versus Tweets
 =================================================================
 Row{data-height=400}
 -----------------------------------------------------------------------
