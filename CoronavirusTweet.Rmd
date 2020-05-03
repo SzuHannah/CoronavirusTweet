@@ -30,15 +30,15 @@ library(shinycssloaders)
 library(plotly)
 library(shinyWidgets)
 #read data
-wordfreq_bydateflo_top15_wocoron<-readRDS("wordfreq_bydateflo_top15_wocoron.rds")
+wordfreq_bydateflo_top15_wocoron<-readRDS("./data/wordfreq_bydateflo_top15_wocoron.rds")
 #topiclswithlink<-readRDS("topiclswithlink.rds")
-topiclswithlink<-readRDS("topiclsbyflowithlink.rds")
-tidypredcovds<-readRDS("tidypredcovds.rds")
-lmformds<-readRDS("lmformds.rds")
-wordpredictors<-readRDS("wordpredictors.rds")
-glmls<-readRDS("glmls.rds")
+topiclswithlink<-readRDS("./data/topiclsbyflowithlink.rds")
+tidypredcovds<-readRDS("./data/tidypredcovds.rds")
+lmformds<-readRDS("./data/lmformds.rds")
+wordpredictors<-readRDS("./data/wordpredictors.rds")
+glmls<-readRDS("./data/glmls.rds")
 #sentifment ds
-uncombineds<-readRDS("uncombineds.rds")
+uncombineds<-readRDS("./data/uncombineds.rds")
 flockchoices<-tibble(flock=c("liberals","conservatives","media","issue-centric","pop culture","academia"))
 topicchoices<-tibble(topic=c("topic 1","topic 2","topic 3",
                    "topic 4","topic 5", "topic 6","topic 7",
