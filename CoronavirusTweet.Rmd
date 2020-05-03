@@ -31,10 +31,12 @@ library(plotly)
 library(shinyWidgets)
 #read data
 wordfreq_bydateflo_top15_wocoron<-readRDS("wordfreq_bydateflo_top15_wocoron.rds")
-topiclswithlink<-readRDS("topiclswithlink.rds")
+#topiclswithlink<-readRDS("topiclswithlink.rds")
+topiclswithlink<-readRDS("topiclsbyflowithlink.rds")
 tidypredcovds<-readRDS("tidypredcovds.rds")
 lmformds<-readRDS("lmformds.rds")
 wordpredictors<-readRDS("wordpredictors.rds")
+glmls<-readRDS("glmls.rds")
 #sentifment ds
 uncombineds<-readRDS("uncombineds.rds")
 flockchoices<-tibble(flock=c("liberals","conservatives","media","issue-centric","pop culture","academia"))
@@ -96,10 +98,15 @@ wordOfFlock<-reactive({
 tweetsurl<-reactive({
   topchoice<-as.character(input$topic)
   flockchoice<-as.character(input$oneflock)
-  datechoice<-as.character(input$date)
-  indexdatflo<-str_c(datechoice,"-",flockchoice)
-  tweetdf<-topiclswithlink[[indexdatflo]][[topchoice]]
+  #datechoice<-as.character(input$date)
+  #indexdatflo<-str_c(datechoice,"-",flockchoice)
+  tweetdf<-topiclswithlink[[flockchoice]][[topchoice]]
   tibble(embeded = tweetdf$embed_url%>%unlist())
+})
+
+glmsum<-reactive({
+  flockchoice<-as.character(input$oneflock)
+  return(glmls[[flockchoice]])
 })
 #for each chunck below, i just put renderXXX functions, eg. renderwordcloud, renderplot, renderUI...
 ```
@@ -173,7 +180,12 @@ Column{data-width=400}
 -----------------------------------------------------------------------
 
 ```{r}
-renderUI({
+fillRow(
+  uiOutput("twitter"),
+  verbatimTextOutput("glmsummary")  
+)
+output$twitter<-
+  renderUI({
     tags$head(
     tags$script("!function(d,s,id){var js,fjs=d.getElementsByTagName(s)    [0],p=/^http:c(/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document,'script','twitter-wjs');")
   )
@@ -181,7 +193,10 @@ renderUI({
     urlvec<-df$embeded
     urlvec%>% HTML()
 })
-
+output$glmsummary<-
+  renderPrint({
+    print(glmsum())
+  })
 ```
 
 

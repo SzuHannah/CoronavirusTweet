@@ -76,7 +76,119 @@ covid_day_allbyflockls<-append(covid_dayls,covid_dayflockls)
 
 ##split the data frame into a list by flock
 covid_flockls<-split(covidds,f=covidds$flock_category)[1:6]
+covid_flockls<-readRDS("covid_flockls.rds")
 ```
+
+###try cluster tweets within each flock across the 60 days (i.e.cluster all tweets within one flock into 30 topics, and each tweet has different time stamp)
+```{r}
+#use covidflottls
+# covidflottls<-readRDS("covidflottls.rds")
+#create cast_sparse for each flock, didn't use lapply, 'cause it'll cause session runout
+dtliberal<-cast_sparse(covidflottls[["liberals"]],tweet,word)
+dtconser<-cast_sparse(covidflottls[["conservatives"]],tweet,word)
+dtmedia<-cast_sparse(covidflottls[["media"]],tweet,word)
+dtissue<-cast_sparse(covidflottls[["issue-centric"]],tweet,word)
+dtpop<-cast_sparse(covidflottls[["pop culture"]],tweet,word)
+dtacademia<-cast_sparse(covidflottls[["academia"]],tweet,word)
+dtliberal<-readRDS("dtliberal.rds")
+dtconser<-readRDS("dtconservatives.rds")
+dtmedia<-readRDS("dtmedia.rds")
+dtissue<-readRDS("dtissue.rds")
+dtpop<-readRDS("dtpop.rds")
+dtacademia<-readRDS("dtacademia.rds")
+faliberal<-falsflock[["liberals"]]
+faconserv<-falsflock[["conservatives"]]
+famedia<-falsflock[["media"]]
+faissue<-falsflock[["issue-centric"]]
+fapop<-falsflock[["pop culture"]]
+faacademia<-falsflock[["academia"]]
+#vsp for each flock
+faliberal<-vsp(dtliberal,k=30)
+#plot_varimax_z_pairs(faliberal, 1:10)
+topTweets = 10
+topDoclib<-faliberal$Z %>% apply(2, function(t) which(rank(-t, ties.method = "random") <= topTweets))
+
+faconserv<-vsp(dtconser,k=30)
+topDoccons<-faconserv$Z %>% apply(2, function(t) which(rank(-t, ties.method = "random") <= topTweets))
+
+famedia<-vsp(dtmedia,k=30)
+topDocmedia<-famedia$Z %>% apply(2, function(t) which(rank(-t, ties.method = "random") <= topTweets))
+
+faissue<-vsp(dtissue,k=30)
+topDocissue<-faissue$Z %>% apply(2, function(t) which(rank(-t, ties.method = "random") <= topTweets))
+
+fapop<-vsp(dtpop,k=30)
+topDocpop<-fapop$Z %>% apply(2, function(t) which(rank(-t, ties.method = "random") <= topTweets))
+
+faacademia<-vsp(dtacademia, k=30)
+topDocacademia<-faacademia$Z %>% apply(2, function(t) which(rank(-t, ties.method = "random") <= topTweets))
+#make the fa into a list
+falsflock<-list(faliberal,faconserv,famedia,faissue,fapop,faacademia)
+#names(falsflock)<-c("liberals","conservatives","media","issue-centric","pop culture","academia")
+lmformds<-readRDS("lmformds.rds")
+logtotalconf<-lmformds%>%select(c(date,total_confirm))%>%mutate(log_conf=log(total_confirm))
+#logtotalconf
+covid_flockls<-readRDS("covid_flockls.rds")
+#covidflock dataset combined with log total confirm number
+covidflock_conf<-lapply(covid_flockls, function(x){
+  x%>%left_join(logtotalconf,by="date")
+})
+saveRDS(covidflock_conf,"covidflock_conf.rds")
+topDocflock<-list(topDoclib,topDoccons,topDocmedia,topDocissue,topDocpop,topDocacademia)
+#names(topDocflock)<-c("liberals","conservatives","media","issue-centric","pop culture","academia")
+#get the correspondent tweets
+topiclsbyflo<-lapply(seq_along(topDocflock), function(i){
+  df<-topDocflock[[i]]
+  txtdf<-covidflock_conf[[i]]
+  ls<-list()
+  for(j in 1:ncol(df)){
+    name<-paste("topic", j)
+    ls[[j]]<-tibble(tweet = txtdf$text[df[,j]], status_id=txtdf$status_id[df[,j]],screen_name=txtdf$screen_name[df[,j]])
+    names(ls)[j]<-name
+  }
+  return(ls)
+})
+
+#paste twitter link to each dataframe, use this one!!!
+#get_embed url of twitter post
+get_embed <- function(status_id){
+
+  api_result <- httr::GET(paste0(
+    "https://publish.twitter.com/oembed?url=https%3A%2F%2Ftwitter.com%2FInterior%2Fstatus%2F",
+    status_id))
+
+  api_content <- httr::content(api_result)
+  html_content <- api_content[["html"]]
+  
+  return(html_content)
+}
+
+topiclsbyflowithlink<-lapply(topiclsbyflo,function(ls){
+  lapply(ls, function(topic){
+    topic%>%
+      mutate(status_url=paste0("https://twitter.com/",screen_name,"/status/",status_id))%>%
+      mutate(embed_url=map(status_id,get_embed))
+  })
+})
+
+glmlib
+covidflock_conf<-readRDS("covidflock_conf.rds")
+falsflock<-readRDS("falsflock.rds")
+#names(topiclsbyflo)<-c("liberals","conservatives","media","issue-centric","pop culture","academia")
+#try linear model
+ylib<-covidflock_conf[["liberals"]]$log_conf
+libfaZ<-falsflock[["liberals"]]$Z
+glmlib<-glm(ylib~as.matrix(libfaZ), family = "gaussian") %>% summary
+#glm of log(totalconfirm)~each topic
+glmls<-lapply(seq_along(covidflock_conf),function(x){
+  y<-covidflock_conf[[x]]$log_conf
+  z<-falsflock[[x]]$Z
+  glm(y~as.matrix(z),family="gaussian")%>%summary
+})
+names(glmls)<-c("liberals","conservatives","media","issue-centric","pop culture","academia")
+summary(glmls[["liberals"]])
+```
+
 
 ##make clusters/topics for the whole covidds
 ```{r}
@@ -84,7 +196,7 @@ covid_flockls<-split(covidds,f=covidds$flock_category)[1:6]
 # covidttls<-readRDS("covidttls.rds")
 # covidflottls<-readRDS("covidflottls.rds")
 # covid_dayflockls<-readRDS("covid_dayflockls.rds")
-
+#covid_flockls<-readRDS("covid_flockls.rds")
 #covidtext by flock
 covidtextls <- lapply(covid_flockls,function(x){
    tibble(tweet = 1:nrow(x), text = x$text)
@@ -130,8 +242,9 @@ topDocdayflo<-lapply(fadayflo, function(x){
   topDoc<-x$Z %>% apply(2, function(t) which(rank(-t, ties.method = "random") <= topTweets))
 })
 #try plot the result from 2020-02-01-media
-plot_varimax_z_pairs(fadayflo[[3]], 1:5)
-
+plot_varimax_z_pairs(fadayflo[[3]], 1:10)
+y_0201case<-tidypredcovds%>%filter(date=="2020-02-01")%>%filter(case_type=="total_confirm")
+y_0201case
 #topDocdayflo<-readRDS("topDocdayflo.rds")
 #covid_dayflockls<-readRDS("covid_dayflockls.rds")
 
@@ -265,7 +378,7 @@ covidusspreadsel%>%ggplot()+geom_line(aes(x = date, y = confirm_test),color="red
 ```
 
 
-###combin coronavirus and tweet
+###combine coronavirus and tweet
 ```{r}
 covidusspreadsel<-covidusspreadsel%>%select(date, total_confirm,total_test,confirm_test)
 covidusspreadsel
