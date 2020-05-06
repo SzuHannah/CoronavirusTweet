@@ -7,7 +7,7 @@ runtime: shiny
   
 ---
 
-```{r setup, include=FALSE}
+```{r global, include=FALSE}
 library(flexdashboard)
 library(dplyr)
 library(tidyr)
@@ -30,13 +30,14 @@ library(shinycssloaders)
 library(plotly)
 library(shinyWidgets)
 #read data
+library(rmarkdown)
 wordfreq_bydateflo_top15_wocoron<-readRDS("./data/wordfreq_bydateflo_top15_wocoron.rds")
 #topiclswithlink<-readRDS("topiclswithlink.rds")
 topiclswithlink<-readRDS("./data/topiclsbyflowithlink.rds")
 tidypredcovds<-readRDS("./data/tidypredcovds.rds")
 lmformds<-readRDS("./data/lmformds.rds")
 wordpredictors<-readRDS("./data/wordpredictors.rds")
-glmls<-readRDS("./data/glmls.rds")
+glmls<-readRDS("./data/glmoutput.rds")
 #sentifment ds
 uncombineds<-readRDS("./data/uncombineds.rds")
 flockchoices<-tibble(flock=c("liberals","conservatives","media","issue-centric","pop culture","academia"))
