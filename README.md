@@ -20,7 +20,20 @@ The initial thought is that social media is a platform where people discuss thin
  
 2. Covid-19 case data source: our complete COVID-19 dataset is a collection of the COVID-19 data maintained by [Our World in Data](https://ourworldindata.org/coronavirus). The repo for raw data can be found [here](https://github.com/owid/covid-19-data/tree/master/public/data). It is updated daily and includes data on confirmed cases, deaths, and testing. The data are updated up-to-date. We used the data of the United States only and the data ranging only from Feb 1st to March 31st to match with the twitter data. The data are mainly from the ECDC (European Centre for Disease Prevention and Control) and the WHO (World Health Organization).
 
-<needs to put a screen shot of the covid-19 data and describe each column>
+- Date: MM/DD/YYYY HH:mm (24-hour format, in UTC). We used the data ranging only from Feb 1st to March 31st to match with the twitter data.
+
+- Total_confirm: the cumulative number of confirmed cases.
+
+- Total_test: the cumulative number of tests performed.
+
+- Confirm_test: the number of confirmed cases for every 100 tests. i.e. (Total_confirm/Total_test)*100
+
+- New_cases: the new confirmed cases on the given date.
+
+- New_deaths: the new deaths on the given date.
+
+- Total_deaths: the cumulative number of deaths up to the date.
+
 
 ### Data Cleaning
 All codes for data cleaning are included in the dataprocessing.Rmd file. 
