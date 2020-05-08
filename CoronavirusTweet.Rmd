@@ -32,7 +32,6 @@ library(shinyWidgets)
 #read data
 library(rmarkdown)
 wordfreq_bydateflo_top15_wocoron<-readRDS("./data/wordfreq_bydateflo_top15_wocoron.rds")
-#topiclswithlink<-readRDS("topiclswithlink.rds")
 topiclswithlink<-readRDS("./data/topiclsbyflowithlink.rds")
 tidypredcovds<-readRDS("./data/tidypredcovds.rds")
 lmformds<-readRDS("./data/lmformds.rds")
@@ -40,6 +39,7 @@ wordpredictors<-readRDS("./data/wordpredictors.rds")
 glmls<-readRDS("./data/glmoutput.rds")
 #sentifment ds
 uncombineds<-readRDS("./data/uncombineds.rds")
+
 flockchoices<-tibble(flock=c("liberals","conservatives","media","issue-centric","pop culture","academia"))
 topicchoices<-tibble(topic=c("topic 1","topic 2","topic 3",
                    "topic 4","topic 5", "topic 6","topic 7",
@@ -57,16 +57,16 @@ casetypes<-c("total_confirm","total_test","confirm_test","new_cases","new_deaths
 
 Sidebar {.sidebar}
 =================================================================
-### Choose a date you want to see (data available from 02/01 to 03/31)
+### User Inputs (data available from 02/01 to 03/31)
 
 ```{r}
 #usually i put input widgets here
 dateInput('date',
-      label = 'Date input:',
+      label = 'Date input (tweet explore):',
       value = '2020-02-01'
 )
 
-checkboxGroupInput("flock", label = 'flock of interest', 
+checkboxGroupInput("flock", label = 'flock of interest (tweet explore)', 
                  choices = list("liberals"="liberals", "conservatives"="conservatives", "media"="media",
                                 "issue-centric"="issue-centric","pop culture"="pop culture","academia"="academia"),
                  selected=c("liberals","media","academia")
@@ -111,13 +111,6 @@ glmsum<-reactive({
 })
 #for each chunck below, i just put renderXXX functions, eg. renderwordcloud, renderplot, renderUI...
 ```
-
-It is said that social network is a place where people discuss things they care about, regarding public health, politics, economics, and etc.  
-
-Often, the discussions are correlated with the development of an event, and can even predict the result, such as an election. During last H1N1 outbreak, there are people using twitter to see 
-if the amount of disease-related words can predict the spread of H1N1. Therefore, for the COVID-19 outbreak, we are interested in examining if such relationship exists. As a biginning, we'll look at the linear relationship. 
-
-The app serves to allow users to explore the tweets under #coronavirus, and plot the relationships between COVID-19 cases and tweet words. 
 
 Tweet Explore
 =================================================================
@@ -175,7 +168,7 @@ renderPlot({
 })
 ```
 
-Tweet Wall (Topic clusters)
+Tweet Wall and Spread of Covid-19 versus Topic clusters
 =================================================================
 Column{data-width=400}
 -----------------------------------------------------------------------
@@ -201,7 +194,7 @@ output$glmsummary<-
 ```
 
 
-Spread of Covid-19 versus Tweets
+Spread of Covid-19 versus Frequent words in tweets
 =================================================================
 Row{data-height=400}
 -----------------------------------------------------------------------
@@ -317,3 +310,13 @@ renderPrint({
    summary(lmds())
 })
 ```
+
+About
+=================================================================
+It is said that social network is a place where people discuss things they care about, regarding public health, politics, economics, and etc.  
+
+Often, the discussions are correlated with the development of an event, and can even predict the result, such as an election. During last H1N1 outbreak, there are people using twitter to see 
+if the amount of disease-related words can predict the spread of H1N1. Therefore, for the COVID-19 outbreak, we are interested in examining if such relationship exists. As a biginning, we'll look at the linear relationship. 
+
+The app serves to allow users to explore the tweets under #coronavirus, and plot the relationships between COVID-19 cases and tweet words. 
+

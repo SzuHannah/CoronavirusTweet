@@ -42,9 +42,11 @@ confirmed_coro_jhu
 
 ```{r}
 #covid<-readRDS("covid_19_tweets.rds")
+covid
 #select the columns needed
 #covidds<-covid%>%select(date, user_id, status_id,screen_name, text, flock_label, flock_category)
 covidds<-readRDS("covidds.rds")
+covidds
 wordfreq_bydate_top50_wocoron<-readRDS("wordfreq_bydate_top50_wocoron.rds")
 #7 levels in total for flock_category:"liberals""conservatives" "media""issue-centric""pop culture""academia""other", but actually there's no data for "other"        
 #flock_categorylevel<-levels(covidds$flock_category)
@@ -73,7 +75,7 @@ covid_dayflockls<-covidds %>% group_by(date, flock_category)%>%group_split()%>%s
 
 ##covidds by date with all categories and by date-flockcategories
 covid_day_allbyflockls<-append(covid_dayls,covid_dayflockls)
-
+str(covidds)
 ##split the data frame into a list by flock
 covid_flockls<-split(covidds,f=covidds$flock_category)[1:6]
 covid_flockls<-readRDS("covid_flockls.rds")
@@ -127,13 +129,14 @@ falsflock<-list(faliberal,faconserv,famedia,faissue,fapop,faacademia)
 #names(falsflock)<-c("liberals","conservatives","media","issue-centric","pop culture","academia")
 lmformds<-readRDS("lmformds.rds")
 logtotalconf<-lmformds%>%select(c(date,total_confirm))%>%mutate(log_conf=log(total_confirm))
-#logtotalconf
+logtotalconf
 covid_flockls<-readRDS("covid_flockls.rds")
 #covidflock dataset combined with log total confirm number
 covidflock_conf<-lapply(covid_flockls, function(x){
   x%>%left_join(logtotalconf,by="date")
 })
 saveRDS(covidflock_conf,"covidflock_conf.rds")
+covidflock_conf<-readRDS("covidflock_conf.rds")
 topDocflock<-list(topDoclib,topDoccons,topDocmedia,topDocissue,topDocpop,topDocacademia)
 #names(topDocflock)<-c("liberals","conservatives","media","issue-centric","pop culture","academia")
 #get the correspondent tweets
@@ -179,14 +182,27 @@ falsflock<-readRDS("falsflock.rds")
 ylib<-covidflock_conf[["liberals"]]$log_conf
 libfaZ<-falsflock[["liberals"]]$Z
 glmlib<-glm(ylib~as.matrix(libfaZ), family = "gaussian") %>% summary
+lmlib<-lm(ylib~as.matrix(libfaZ))%>%summary
+lmlib
 #glm of log(totalconfirm)~each topic
 glmls<-lapply(seq_along(covidflock_conf),function(x){
   y<-covidflock_conf[[x]]$log_conf
   z<-falsflock[[x]]$Z
   glm(y~as.matrix(z),family="gaussian")%>%summary
 })
+
 names(glmls)<-c("liberals","conservatives","media","issue-centric","pop culture","academia")
-summary(glmls[["liberals"]])
+result<-capture.output(glmls[["liberals"]])
+glmoutput<-lapply(glmls, function(x){
+  capture.output(x)
+})
+#glm, family = "gaussian" is the same as linear model
+lmls<-lapply(seq_along(covidflock_conf),function(x){
+  y<-covidflock_conf[[x]]$log_conf
+  z<-falsflock[[x]]$Z
+  lm(y~as.matrix(z))%>%summary
+})
+names(lmls)<-c("liberals","conservatives","media","issue-centric","pop culture","academia")
 ```
 
 
@@ -305,6 +321,7 @@ outls<-lapply(seq_along(coviddayflotextls),function(x){
     get_sentences(text),
     list(column_label)))
 })
+outls<-readRDS("outls.rds")
 bind_rows(coviddayflotextls[1], .id = "column_label")
 uncombinout<-lapply(outls, function(x){
   uncombine(x)
@@ -337,7 +354,7 @@ plot(combine(coviddayflotextsent[[1]]))
 
 ###find common words across days
 ```{r}
-wordfreq_bydateflo_top15_wocoron<-readRDS("wordfreq_bydateflo_top15_wocoron.rds")
+wordfreq_bydateflo_top15_wocoron<-readRDS("./data/wordfreq_bydateflo_top15_wocoron.rds")
   all60topwordls<-wordfreq_bydateflo_top15_wocoron[1:60]
 summaryls<-lapply(seq_along(all60topwordls), function(x){
   df<-all60topwordls[[x]]%>%mutate(date=names(all60topwordls[x]))
@@ -383,6 +400,11 @@ covidusspreadsel%>%ggplot()+geom_line(aes(x = date, y = confirm_test),color="red
 covidusspreadsel<-covidusspreadsel%>%select(date, total_confirm,total_test,confirm_test)
 covidusspreadsel
 covidus_casedeathsel<-covidus_casedeathsel%>%select(-total_cases)
+covidus_casedeathsel
+#for reporting data source
+joinedcovid<-covidusspreadsel%>%left_join(covidus_casedeathsel)
+joinedcovid
+
 wordpredcov<-lapply(wordpredls, function(x){
   x %>% left_join(covidusspreadsel)%>%left_join(covidus_casedeathsel)
 })
@@ -510,7 +532,7 @@ cvfit = cv.glmnet(as.matrix(fa$Z),y,
 plot(cvfit)
 ```
 
-  ##stopwords
+##stopwords
 ```{r}
 #tidytext builtin stop words
 data("stop_words")
