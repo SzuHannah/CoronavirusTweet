@@ -16,7 +16,8 @@ The initial thought is that social media is a platform where people discuss thin
 ### Data Sources & Data descriptions
 1. Tweet data source: tweets were collected from Twitter API, and the twitter accounts were further divieds into flocks, the work was done by Karl's lab, which is same as the [murmuration website](https://murmuration.wisc.edu/historical/2020-05-04#event-1). 
 
-![Tweets](image/tweets_head.png)
+![Tweets](image/tweets_head.png)  
+*Fig. 1: Tweets data*
 
 - Date: YYYY/MM/DD. The data was collected from Feb 1st to March 31st.
 
@@ -32,7 +33,8 @@ The initial thought is that social media is a platform where people discuss thin
  
 2. Covid-19 case data source: our complete COVID-19 dataset is a collection of the COVID-19 data maintained by [Our World in Data](https://ourworldindata.org/coronavirus). The repo for raw data can be found [here](https://github.com/owid/covid-19-data/tree/master/public/data). It is updated daily and includes data on confirmed cases, deaths, and testing. The data are updated up-to-date. We used the data of the United States only and the data ranging only from Feb 1st to March 31st to match with the twitter data. The data are mainly from the ECDC (European Centre for Disease Prevention and Control) and the WHO (World Health Organization).
 
-![Covid-19 case data](image/covidds_head.png)
+![Covid-19 case data](image/covidds_head.png)  
+*Fig. 2: Covid-19 case data*
 
 - Date: MM/DD/YYYY HH:mm (24-hour format, in UTC). We used the data ranging only from Feb 1st to March 31st to match with the twitter data.
 
@@ -76,7 +78,8 @@ wordfreq_bydateflo_top15_wocoron<-lapply(wordfreq_bydateflo_covid, function(x){
     top_n(15)
 })
 ```
-![wordfreq_bydateflo_top15_wocoron data](image/wordfreq_bydateflo_top15_wocoron.png)  
+![wordfreq_bydateflo_top15_wocoron data](image/wordfreq_bydateflo_top15_wocoron.png)    
+*Fig. 3: wordfreq_bydateflo_top15_wocoron data*
 
 - Sentiment distribution session: to prevent R session abort, we sampled 50% of the tweet data to visualize(called **coviddayflotextls**). In order to have a more comprehensive view of the tweet sentiments, we analyze the text sentiments by sentences with the [library(sentimentr)](https://github.com/trinker/sentimentr). For each data frame within the **coviddayflotextls**, use get_sentences() to split each tweet into the sentence level, then calculate the sentences' sentiments with sentiment_by(), and the dataset is called **outls**. For each date-flock, this process will return a summary of the sentiment for the tweets within the specific date and flock, including wordcount of the tweets, standard deviation of the tweet sentence sentiments, and average sentiment, With a view to plotting the sentiment distribution for each date-flock, we use uncombin() to get the sentiment score for the tweet sentences wihtin each date-flock, and the data is called **uncombineds**. 
 ```R
@@ -101,15 +104,11 @@ uncombinout<-lapply(outls, function(x){
 #convert list into dataframe
 uncombineds<-bind_rows(uncombinout)
 ```
-<center>
-![outls data](image/outls.png)
+![outls data](image/outls.png)  
+*Fig. 4: outls data*
 
-</center>
-
-<center>
-![uncombineds data](image/uncombineds.png)
-
-</center>
+![uncombineds data](image/uncombineds.png)  
+*Fig. 5: uncombineds data*
 
 2. Tweet Wall
 
@@ -190,7 +189,8 @@ topiclsbyflowithlink<-lapply(topiclsbyflo,function(ls){
   })
 })
 ```
-![topiclsbyflowithlink data](image/topiclswithlink.png)
+![topiclsbyflowithlink data](image/topiclswithlink.png)  
+*Fig. 6: topiclsbyflowithlink data*
 
 - Generalized Linear Model summary: the glm() takes the log(total_confirm_cases) as y, and the Z matrices from vsp as predictors (i.e. each flock's 30 topics). Therefore, we did log transformation on the "total_confirm" case number from the original covid-19 case data, along with the date of the observations, to construct a **logtotalconf** dataframe. Then we joined this **logtotalconf** with the **covid_flockls** tweet data to create a **covidflock_conf** data that contains both case numbers and tweets. To build the glm for each flock, we lapplyed through **covidflock_conf**, for each element, set log(total_confirm_cases) as y and take the correspondent Z matrix in **falsflock** from vsp as predictors. The final cleaned data set is called **glmls**. To reduce data size, we only put the output summary table (called **glmoutput**) on the shiny app.   
 
@@ -212,23 +212,16 @@ glmoutput<-lapply(glmls, function(x){
 })
 ```
 
-![logtotalconf data](image/logtotalconf.png)
+![logtotalconf data](image/logtotalconf.png)  
+*Fig. 7: logtotalconf data*  
+![covidflock_conf data](image/covidflock_conf.png)  
+*Fig. 8: covidflock_conf data*  
+![falsflock data](image/falsflock.png)  
+*Fig. 9: falsflock data*  
+![glmls data](image/glmls.png)  
+*Fig. 10: glmls data*  
 
-![covidflock_conf data](image/covidflock_conf.png)
-
-![falsflock data](image/falsflock.png)
-
-![glmls data](image/glmls.png)
-
-3. Spread of Covid-19 v.s. frequent words
-
-- Covid-19 case trends sessions (Covid-19 Confirmed, Tested & Covid-19 Confirm per 100 tests)
-
-- Facet plot
-
-- Single plot 
-
-- Linear model
+3. Spread of Covid-19 v.s. frequent words: in this tab, two forms of dataset were used, one was tidy form for ggplot, and the other was untidy form for constructing linear models. To link the Covid-19 case numbers with the tweet words mentioned in the first tab, we used the **wordfreq_bydateflo_top15_wocoron** dataset to find words that make the top-list in more than 40 days. Then we filtered the dataset to make it only contain these top frequent words, and their counts on each date (the data is called **dswithwordpred**). After, this **dswithwordpred** was splitted into a list of dataframes by these words, called **wordpredls**. With a view to using these words as predictors and regress with different types of case numbers, including "total_confirm","total_test","confirm_test","new_cases","new_deaths",and "total_deaths". we joined the  **wordpredls** with covid-19 case datasets (in the following code they are called **covidusspreadsel** and **covidus_casedeathsel**, the former consists of "total_confirm","total_test","confirm_test", while the latter contains "new_cases","new_deaths",and "total_deaths"), and then convert the dataframe into tidy(**tidypredcovds**) and untidy form(**lmformds**).
 
 ```R
 wordfreq_bydateflo_top15_wocoron<-readRDS("wordfreq_bydateflo_top15_wocoron.rds")
@@ -238,19 +231,16 @@ summaryls<-lapply(seq_along(all60topwordls), function(x){
 })
 summaryds<-bind_rows(summaryls,.id="column_label")
 wordoccur40<-summaryds%>%group_by(word)%>%filter(n()>40)
-#the words that occur in more than 40 days
+#the words that make the top-list in more than 40 days
 thewords<-wordoccur40%>%group_by(word)%>%summarise(count=n())
 wordpredictors<-thewords$word
-saveRDS(wordpredictors,"wordpredictors.rds")
 dswithwordpred<-wordoccur40%>%filter(word %in% wordpredictors)%>%mutate(date=as.Date(date))
 
-#each word is a data frame: count v.s. date
+#split dswithwordpred by the words
 wordpredls<-dswithwordpred%>%group_by(word)%>%group_split()
 names(wordpredls)<-wordpredictors
 
-covidusspreadsel<-covidusspreadsel%>%select(date, total_confirm,total_test,confirm_test)
-covidusspreadsel
-covidus_casedeathsel<-covidus_casedeathsel%>%select(-total_cases)
+#join wordpredls with covid case numbers
 wordpredcov<-lapply(wordpredls, function(x){
   x %>% left_join(covidusspreadsel)%>%left_join(covidus_casedeathsel)
 })
@@ -259,45 +249,67 @@ wordpredcovds<-bind_rows(wordpredcov)
 #tidy form for ggpplot
 tidypredcovds<-wordpredcovds%>%pivot_longer(cols = c("total_confirm","total_test","confirm_test","new_cases","new_deaths","total_deaths"),names_to = "case_type",values_to = "case_number")%>%drop_na()
 
-#take log for case_number since they are all increasing exponentially
-tidyepidcov%>%ggplot(aes(x=n, y=log(case_number)))+geom_point()+facet_wrap(~case_type,scales = "free")
-
 #untidy form for linear model
 lmformds<-wordpredcovds%>%group_by(date)%>%pivot_wider(names_from = word,values_from = n)
 ```
+![dswithwordpred data](image/dswithwordpred.png)  
+*Fig. 11: dswithwordpred data*
+
+![wordpredls data](image/wordpredls.png)  
+*Fig. 12: wordpredls data*
+
+![tidypredcovds data](image/tidypredcovds.png)  
+*Fig. 13: tidypredcovds data*
+
+![lmformds data](image/lmformds.png)  
+*Fig. 14: lmformds data*
 
 ### Statistical Techniques
-1. Tweet Explore
 
-2. Tweet Wall
+1. Tweet Explore: descriptive statistics. For word frequencies, sum is used, as for sentiment distribution, boxplot(i.e. quantiles were used).
 
-3. Spread of Covid-19 v.s. frequent words
+2. Tweet Wall: vsp for clustering, and linear model for examine if the topics are significant for explaining the variance in the log(total confirm case). We choose vsp instead of pca because vsp rotates the axes, which make the result more interpretable; as for the linear model, because the app serves as an exploratory purpose, linear model is easier for users to interpret. 
+
+3. Spread of Covid-19 v.s. frequent words: linear model, reason is same as above.
 
 ## Usage of the App
-<include gif for each tab>
-  
+
 1. Tweet Explore
 
+Please choose the date input first, and then choose a flock that you are intered in. Then you'll see the visualizations dynamically change. In the "Word Frequency (Summary by flock)" session, it displays the top 15 tweet words that exist within the specified date-flock. In the "Word Frequencey (Summary of the date)" session, it displays the top 15 tweet words on that date (regardless of flocks). The "sentiment distribution" displays with boxplots. The box contains first, second, and third quantiles, and the dots are outliers.  
+(If nothing displays, please click on any date and flock of interest to trigger the plot to re-render)
+
 2. Tweet Wall
+
+Please select a topic and a flock to see the tweet posts that were clustered into the topic. Then the user will see the correspondent glm summary table for that flock. Each as.matrix(z)1, 2, 3... represents a topic, i.e. as.matrix(z)1 is topic 1, as.matrix(z)2 is topic 2. The y in the model represents the log transformation of the total confirm case. The tweets and summary table are constructed with the data across 60 days, i.e., the unit of analysis is a day. There may be some duplicate tweets with different time stamp, or because the tweets' status ids are different, they are still all included.  Or if the tweet posts are missing, it may mean that they were deleted, so the html widget could not obtain the post. 
 
 3. Spread of Covid-19 v.s. frequent words
 
 ## Results
-<give an example for each tab>
+
+Here, we will present an example result for each tab.
   
 1. Tweet Explore
 
-Users are able to see the data which they are interested in. For example, the tweets written on February 1st and related to the liberals, media and academia flocks on the image below.
+Here is an example that we choose February 1stat date, and flocks of interests are "liberals", "media", and "academia". The top row shows the top 15 words for each flock on that date, and the bottom left shows the summary of top words' frequencies for all 6 flocks on that date. As is shown in the plots, there are several words that make the list for all flocks, such as "outbreak" and "wuhan". However, there are also flock-specific words, for example, "sars" and "misinformation" only occurs in media flock. The reason may be that they are in charge of delivering information, and compare covid-19 with sars to let the audience be more aware of the disease. The bottom right is the sentiment distribution for the flocks we chose. For the three flocks we chose, 75% of the tweets' sentiments are below 0, and tweets from academia seemed to have a rather centralized sentimental distirubtion. 
+
+![tweetexplore](image/tweetexplore.png)  
+*Fig. 15: Tweet explore example*
 
 2. Tweet Wall
 
-Users are able to see the actual tweets related to a specific topic and a flock they are interested in. For example, the tweets related to liberals and topic 1.
+Here is an example that we choose topic 4 of liberals. If you scroll through, it's mainly talking about how Trump deals with Covid-19. In the summary table, it is shown that, for tweets within liberals flock, topic 1-5, topic 7-18, topic 20-27 and topic 30 are all siginificant for explaining the variance in log(total confirm case numbers). Looking through some of the significant topics, for example, topic 10 seems to be talking about the spread of Covid-19 within U.S. Topic 11 seems to be talking about WHO.
+
+![tweetwall](image/tweetwall.png)  
+*Fig. 16: Tweet wall example*
 
 3. Spread of Covid-19 v.s. frequent words
 
-Under this tab, users are able to see plenty of graphics. On the top-left side, the graph displays the cumulative number of confirmed cases and the cumulative number of tests performed along the timeline, just to represent the trend of the pandemic. The graph next to it is to show the relationship between those two variables. It could be a good indicator. For example, showing how fast it is spreading. On the bottom-right and bottom-center, users are able to explore the graphs with variables that they might be interested in. Facet plot is for users who are interested in all attributes and want to see everything at a glance. On the bottom-right, users are able to explore the statistical model to estimate the predictions based on the linear model. Using a check box, readers can choose predictors and the dependent variable they want to predict. The words used as predictors are the most frequent words that appeared over 40 days. We took a log for Total_confirm and Total_test variables to make them linear, since they are increasing exponentially. 
+Under this tab, users are able to see plenty of graphics. On the top-left side, the graph displays the cumulative number of confirmed cases and the cumulative number of tests performed along the timeline, just to represent the trend of the pandemic. The graph next to it is to show the relationship between those two variables. It could be a good indicator. For example, showing how fast it is spreading. On the bottom-right and bottom-center, users are able to explore the graphs with variables that they might be interested in. Facet plot is for users who are interested in all attributes and want to see everything at a glance. On the bottom-right, users are able to explore the statistical model to estimate the predictions based on the linear model. Using a check box, readers can choose predictors and the dependent variable they want to predict. The words used as predictors are the most frequent words that appeared over 40 days. We took a log for Total_confirm and Total_test variables to make them linear, since they are increasing exponentially.
+
+![spread](image/spread.png)
+*Fig. 17: Spread of Covid-19 v.s. Frequent words in tweets example*
 
 ## Conclusions
-<Summarize evidence and limitations>
 
 Using the ShinyR package, the app successfully displayed the twitter data and the Covid-19 data with plenty of graphics and interactivity. In our app, users are allowed to navigate the data in their own ways, which dramatically escalated the readability of the data even to users who do not have statistical knowledge. There are some ways this app could be improved. For example, the predictors for the linear model could be changed with user’s interest. For example, a user might want to see the relationship between Covid-19 data and the most frequent words on the specific day and in a specific flock of interest.
